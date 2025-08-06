@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Liste de joueurs</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+
+        th, td {
+            padding: 8px 12px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Liste des joueurs triée par temps</h1>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Nom du joueur</th>
+                <th>Temps</th>
+            </tr>
+        </thead>
+        <tbody id="player-list">
+            <!-- Les données des joueurs seront insérées ici par JavaScript -->
+        </tbody>
+    </table>
+
+    <script>
+        // Liste des joueurs avec leurs temps
+        const players = [
+            { name: "Joueur 1", time: 9.5 },
+            { name: "Joueur 2", time: 8.2 },
+            { name: "Joueur 3", time: 7.8 },
+            { name: "Joueur 4", time: 10.1 },
+            { name: "Joueur 5", time: 6.9 }
+        ];
+
+        // Tri des joueurs par temps croissant
+        players.sort((a, b) => a.time - b.time);
+
+        // Fonction pour afficher les joueurs dans la table
+        function displayPlayers() {
+            const playerList = document.getElementById("player-list");
+            players.forEach(player => {
+                const row = document.createElement("tr");
+                row.innerHTML = `<td>${player.name}</td><td>${player.time} s</td>`;
+                playerList.appendChild(row);
+            });
+        }
+
+        // Appel de la fonction pour afficher la liste
+        displayPlayers();
+    </script>
+
+</body>
+</html>

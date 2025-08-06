@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minesweeper</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+        form {
+            margin-bottom: 20px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(7, 30px);
+            grid-gap: 2px;
+            justify-content: center;
+        }
+        .cell {
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #999;
+            background-color: lightgray;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .revealed {
+            background-color: white;
+        }
+        .bomb {
+            background-image: url('data:image/png;base64,INSERT_BOMB_IMAGE_HERE');
+            background-size: cover;
+        }
+        .flag {
+            background-image: url('data:image/png;base64,INSERT_FLAG_IMAGE_HERE');
+            background-size: cover;
+        }
+        .num-1 { color: blue; }
+        .num-2 { color: green; }
+        .num-3 { color: red; }
+        .num-4 { color: darkblue; }
+        .num-5 { color: brown; }
+        .num-6 { color: cyan; }
+        .num-7 { color: black; }
+        .num-8 { color: gray; }
+    </style>
+</head>
+<body>
+    <h1>Minesweeper</h1>
+    <p id="current-player">Player : François</p>
+    <form method="POST" action="/set_username">
+        <input type="text" name="player_name" placeholder="Entrez votre nom" required>
+        <button type="submit">Mettre à jour</button>
+    </form>
+    <div class="grid" id="minesweeper-grid"></div>
+    
+    <script>
+        function createGrid() {
+            const grid = document.getElementById("minesweeper-grid");
+            for (let i = 0; i < 49; i++) {
+                let cell = document.createElement("div");
+                cell.classList.add("cell");
+                cell.onclick = () => revealCell(cell);
+                cell.oncontextmenu = (event) => flagCell(event, cell);
+                grid.appendChild(cell);
+            }
+        }
+        function revealCell(cell) {
+            cell.classList.add("revealed");
+        }
+
+        function flagCell(event, cell) {
+            event.preventDefault(); // Empêche l'ouverture du menu contextuel
+            if (!cell.classList.contains("revealed")) {
+                cell.classList.toggle("flag");
+            }
+        }
+        createGrid();
+    </script>
+</body>
+</html>
