@@ -1,12 +1,9 @@
+import java.awt.image.BufferedImage;
+import java.io.*;
 import java.net.*;
 import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.io.*;
 import java.util.*;
-import java.util.Arrays;
-import java.util.List;
 import java.util.zip.GZIPOutputStream;
-import java.awt.image.BufferedImage;
 import javax.imageio.ImageIO;
 
 //doit suprimer le cookie pour continuer de tester car mon client a tjr le meme cookie 
@@ -23,6 +20,7 @@ public class ThreadWorker implements Runnable{
     private PrintWriter responseStream;
     private Session session = new Session();
     private static Map<String, Session> sessionStore = new HashMap<>();// faire un systeme pr que les perime se barrent
+    private static final List<Session> finishedGame = Collections.synchronizedList(new ArrayList<>());
     private static boolean firstLaunch = true;//variable pour reset le cookie sinon erreur lors du redemarage du serveur car sessionStore est reset
     private List<char[]> game;
     private String bomb;
@@ -176,7 +174,7 @@ public class ThreadWorker implements Runnable{
             //HTTP/1.1 200 OK
             //generer la page leaderboard.html
             leaderboardHTML page = new leaderboardHTML();
-            sendHttpResponse(200, "OK", page.generateLeaderboardHTML(), fullRequest.get(3));
+            sendHttpResponse(200, "OK", page.generateLeaderboardHTML(finishedGame), fullRequest.get(3));
 
         }
         else if(fullRequest.get(0).equals("GET / HTTP/1.1")){
@@ -373,6 +371,8 @@ public class ThreadWorker implements Runnable{
                 game = gameManager.getGame();
                 session.setGame(game);
                 sendGrid(game, "GAME WON", webSocket);
+                session.endGame();
+                finishedGame.add(session);
                 return -1;
             }
             else if(gameManager.getGameState() == -1){
@@ -380,6 +380,7 @@ public class ThreadWorker implements Runnable{
                 game = gameManager.getGame();
                 session.setGame(game);                
                 sendGrid(game, "GAME LOST", webSocket);
+                session.endGame();
                 return -1;
             }
             game = gameManager.getGame();
@@ -558,9 +559,15 @@ public class ThreadWorker implements Runnable{
 
             GameManager gameManager = new GameManager(session.getGame());
             gameManager.Try(row, col);
+            
 
             game = gameManager.getGame();
             session.setGame(game);
+            if(gameManager.getGameState() == 1){
+                //à appronfondir 
+                session.endGame();
+                finishedGame.add(session);
+            }
 
             playHTML page = new playHTML();
             //sendHttpResponse(200, "OK", page.generatePlayHTML(session, bomb, flag), cookie);
@@ -595,5 +602,7 @@ public class ThreadWorker implements Runnable{
             return;
         }
     }
+
+    
 }
 

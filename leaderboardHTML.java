@@ -1,5 +1,7 @@
+import java.util.*;
+
 public class leaderboardHTML{
-    public String generateLeaderboardHTML(){
+    public String generateLeaderboardHTML(List<Session> finishedGames){
         StringBuilder html = new StringBuilder();
 
         html.append("<!DOCTYPE html>\n");
@@ -7,7 +9,7 @@ public class leaderboardHTML{
         html.append("<head>\n");
         html.append("    <meta charset=\"UTF-8\">\n");
         html.append("    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n");
-        html.append("    <title>Liste de joueurs</title>\n");
+        html.append("    <title>Classement des meilleurs joueurs</title>\n");
         html.append("    <style>\n");
         html.append("        body {\n");
         html.append("            font-family: Arial, sans-serif;\n");
@@ -32,20 +34,10 @@ public class leaderboardHTML{
         html.append("            background-color: #4CAF50;\n");
         html.append("            color: white;\n");
         html.append("        }\n");
-        html.append("        tr:nth-child(even) {\n");
-        html.append("            background-color: #f2f2f2;\n");
-        html.append("        }\n");
-        html.append("        .header {\n");
-        html.append("            text-align: center;\n");
-        html.append("            margin-bottom: 20px;\n");
-        html.append("        }\n");
         html.append("    </style>\n");
         html.append("</head>\n");
         html.append("<body>\n");
-        html.append("    <div class=\"header\">\n");
-        html.append("        <h1>Liste des joueurs triée par temps</h1>\n");
-        html.append("    </div>\n");
-        html.append("    <table>\n");
+/*        html.append("    <table>\n");
         html.append("        <thead>\n");
         html.append("            <tr>\n");
         html.append("                <th>Nom du joueur</th>\n");
@@ -74,10 +66,59 @@ public class leaderboardHTML{
         html.append("            });\n");
         html.append("        }\n");
         html.append("        displayPlayers();\n");
-        html.append("    </script>\n");
+        html.append("    </script>\n");*/
+        if(finishedGames == null){
+            html.append("   <h1> Aucun score disponible</h1>");
+        }
+        else{
+            html.append(getLearderBoard(finishedGames));
+        }
         html.append("</body>\n");
         html.append("</html>\n");
 
         return html.toString();
+    }
+
+    private String getLearderBoard(List<Session> finishedGames){
+
+        StringBuilder leaderBoard = new StringBuilder();
+        List<Session> sortedGames = new ArrayList<>(finishedGames);
+        sortedGames.sort(Comparator.comparingLong(Session::getDuration));
+        leaderBoard.append("    <h1>Classement des meilleurs joueurs</h1>");    
+        leaderBoard.append("    <table>");
+        leaderBoard.append("        <thead>");
+        leaderBoard.append("            <tr>");
+        leaderBoard.append("                <th scope=\"col\">Classement</th>");
+        leaderBoard.append("                <th scope=\"col\">Joueur</th>");
+        leaderBoard.append("                <th scope=\"col\">Score</th>");
+        leaderBoard.append("            </tr>");
+        leaderBoard.append("        </thead>");
+        leaderBoard.append("        <tbody>");
+
+        int classement = 0;
+        for(Session game : sortedGames){
+            ++classement;
+            long second = (game.getDuration() / 1000) %60;
+            long Minute = (game.getDuration() / 1000) /60;
+
+            leaderBoard.append("            <tr>");
+            String line = "            <td>"+classement+"</td><td>"+game.getPlayer()+"</td><td> "+String.format("%02d:%02d", Minute,second)+"</td>";
+            leaderBoard.append(line);
+            leaderBoard.append("            </tr>");
+
+        }
+        if(classement == 0){
+            leaderBoard.append("            <tr>");
+            String line = "            <td>"+classement+"</td><td>"+"No player has won yet"+"</td><td> "+"00:00"+"</td>";
+            leaderBoard.append(line);
+            leaderBoard.append("            </tr>");
+        }
+
+
+        leaderBoard.append("        </tbody>");
+        leaderBoard.append("    </table>");
+
+
+        return leaderBoard.toString();
     }
 }
