@@ -3,6 +3,7 @@ import java.io.*;
 import java.net.*;
 import java.security.MessageDigest;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.zip.GZIPOutputStream;
 import javax.imageio.ImageIO;
 
@@ -18,10 +19,12 @@ public class ThreadWorker implements Runnable{
     private OutputStream outputStream;
     private InputStream requestStream;
     private PrintWriter responseStream;
-    private Session session = new Session();
-    private static Map<String, Session> sessionStore = new HashMap<>();// faire un systeme pr que les perime se barrent
+    private Session session = null;
+    private static final Map<String, Session> sessionStore = new ConcurrentHashMap<>();// faire un systeme pr que les perime se barrent
     private static final List<Session> finishedGame = Collections.synchronizedList(new ArrayList<>());
     private static boolean firstLaunch = true;//variable pour reset le cookie sinon erreur lors du redemarage du serveur car sessionStore est reset
+    private boolean setCookie = false;
+    private String newSessionId = null;
     private List<char[]> game;
     private String bomb;
     private String flag;
@@ -32,7 +35,7 @@ public class ThreadWorker implements Runnable{
             this.socket = s;
             this.outputStream = s.getOutputStream();
             this.requestStream = s.getInputStream();
-            this.responseStream = new PrintWriter(s.getOutputStream(), false);            
+            this.responseStream = new PrintWriter(s.getOutputStream(), false);
         } 
         catch (Exception e) {
             System.err.println("error in the ThreadWorker constructor : " + e);
@@ -48,7 +51,7 @@ public class ThreadWorker implements Runnable{
             bomb = base64Encoder("bomb.png");
             flag = base64Encoder("flag.png");
 
-            while(true){    
+            while(true){
                 List<String> fullRequest = getClientRequest();//ok ca marche
 
                 if(fullRequest == null){
@@ -57,16 +60,28 @@ public class ThreadWorker implements Runnable{
 
                 System.out.println("requete : " + fullRequest.get(0));
                 //System.out.println("headers : " + fullRequest.get(1));
-                System.out.println("body : " + fullRequest.get(2));            
+                System.out.println("body : " + fullRequest.get(2));
                 //System.out.println("cookie : " + fullRequest.get(3));
                 //System.out.println("wsKey : " + fullRequest.get(4));
 
                 
                 String sessionID;
-                if(fullRequest.get(3) != ""){//recupere la session en fct du cookie recu
-                    sessionID = fullRequest.get(3).split("=")[1].trim();
-                    session = sessionStore.get(sessionID);
+                if(!fullRequest.get(3).isEmpty()){//recupere la session en fct du cookie recu
+                    String cookie = fullRequest.get(3);
+                    if(!cookie.isEmpty()){
+                        String[] cookieInfo = cookie.split(":");
+                        for(String part : cookieInfo[1].split(";")){
+                            if(part.startsWith("SESSID="))
+                            sessionID = part.substring(7).trim();
+                        }
+                    }
+
+                    if(sessionID != null)
+                        session =sessionStore.get(sessionID);
+                    /*sessionID = fullRequest.get(3).split("=")[1].trim();
+                    session = sessionStore.get(sessionID);*/
                 }
+
 
                 if(fullRequest.get(0).startsWith("GET")){
                     if(fullRequest.get(0).contains("/webSocket")){
@@ -75,7 +90,7 @@ public class ThreadWorker implements Runnable{
                         break;//plus besoin de la connection vu qu on a le websocket
                     }
                     else handleGetRequest(fullRequest);
-                }                    
+                }
                 else if(fullRequest.get(0).startsWith("POST"))
                     handlePostRequest(fullRequest);
                 else{// en theorie pas besoin car seulement de GET et POST depuis un navigateur
@@ -87,7 +102,7 @@ public class ThreadWorker implements Runnable{
             }
         }
         catch (Exception e) {
-            System.err.println("error in run method : " + e);        
+            System.err.println("error in run method : " + e);
         }
         finally {//fermeture des Stream et du socket
             try {
@@ -137,7 +152,7 @@ public class ThreadWorker implements Runnable{
                                 gzipCompression = true;
                             }
                         }
-                    }                    
+                    }
                     header += line + "\n";
 
                     if(line.toLowerCase().startsWith("content-length")){
@@ -150,7 +165,7 @@ public class ThreadWorker implements Runnable{
                     inputRequest.read(bodyChars, 0, contentLength);
                     body += new String (bodyChars);
                 }
-            }    
+            }
             
         } catch (Exception e) {
             System.err.println("error in getClientRequest method : " + e);
@@ -229,7 +244,7 @@ public class ThreadWorker implements Runnable{
             StringBuilder http = new StringBuilder();
             http.append("HTTP/1.1 " + statusCode + " " + statusMessage + "\r\n");
             if(cookie.equals("")){
-                //System.out.println("pas de cookie trouver");     
+                //System.out.println("pas de cookie trouver");
                 if(!firstLaunch){
                     http.append("Set-Cookie: SESSID=" + randomCookie() + "; Max-Age=3600; path=/; HttpOnly" + "\r\n");
                 }
@@ -277,7 +292,7 @@ public class ThreadWorker implements Runnable{
         } while(sessionStore.containsKey(cookie));
         
         sessionStore.put(cookie, new Session());
-        System.out.println("cookie cree: " + cookie);        
+        System.out.println("cookie cree: " + cookie);
         return cookie;
     }
 
@@ -378,7 +393,7 @@ public class ThreadWorker implements Runnable{
             else if(gameManager.getGameState() == -1){
                 gameManager.cheat();
                 game = gameManager.getGame();
-                session.setGame(game);                
+                session.setGame(game);
                 sendGrid(game, "GAME LOST", webSocket);
                 session.endGame();
                 return -1;
@@ -564,7 +579,7 @@ public class ThreadWorker implements Runnable{
             game = gameManager.getGame();
             session.setGame(game);
             if(gameManager.getGameState() == 1){
-                //à appronfondir 
+                //à appronfondir
                 session.endGame();
                 finishedGame.add(session);
             }
