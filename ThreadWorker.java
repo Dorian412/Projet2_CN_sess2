@@ -5,6 +5,7 @@ import java.security.MessageDigest;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.zip.GZIPOutputStream;
+import javax.imageio.IIOException;
 import javax.imageio.ImageIO;
 
 //doit suprimer le cookie pour continuer de tester car mon client a tjr le meme cookie 
@@ -24,7 +25,7 @@ public class ThreadWorker implements Runnable{
     private static final List<Session> finishedGame = Collections.synchronizedList(new ArrayList<>());
     private static boolean firstLaunch = true;//variable pour reset le cookie sinon erreur lors du redemarage du serveur car sessionStore est reset
     private boolean setCookie = false;
-    private String newSessionId = null;
+    private String SESSID = null;
     private List<char[]> game;
     private String bomb;
     private String flag;
@@ -52,6 +53,7 @@ public class ThreadWorker implements Runnable{
             flag = base64Encoder("flag.png");
 
             while(true){
+                SESSID = null;
                 List<String> fullRequest = getClientRequest();//ok ca marche
 
                 if(fullRequest == null){
@@ -65,23 +67,38 @@ public class ThreadWorker implements Runnable{
                 //System.out.println("wsKey : " + fullRequest.get(4));
 
                 
-                String sessionID;
+                
                 if(!fullRequest.get(3).isEmpty()){//recupere la session en fct du cookie recu
-                    String cookie = fullRequest.get(3);
-                    if(!cookie.isEmpty()){
-                        String[] cookieInfo = cookie.split(":");
-                        for(String part : cookieInfo[1].split(";")){
-                            if(part.startsWith("SESSID="))
-                            sessionID = part.substring(7).trim();
+                    String cookieHeader = fullRequest.get(3);
+
+                    int index = cookieHeader.indexOf(":");
+                    String cookie = null;
+                    if(index >=0)
+                        cookie = cookieHeader.substring(index + 1).trim();
+                    else
+                        cookie = cookieHeader.trim();
+
+                    if( cookie != null &&!cookie.isEmpty()){
+                        
+                        for(String part : cookie.split(";")){
+                            String p =part.trim();
+                            if(p.regionMatches(true, 0, "SESSID=", 0, 7)){
+                                SESSID = part.substring(7).trim();
+                                break;
+                            }
                         }
                     }
 
-                    if(sessionID != null)
-                        session =sessionStore.get(sessionID);
-                    /*sessionID = fullRequest.get(3).split("=")[1].trim();
-                    session = sessionStore.get(sessionID);*/
+                    if(SESSID != null)
+                        session =sessionStore.get(SESSID);
+                    
                 }
 
+                if(session == null){
+                    SESSID = randomCookie();
+                    session = sessionStore.get(SESSID);
+                    setCookie = true;
+                }    
 
                 if(fullRequest.get(0).startsWith("GET")){
                     if(fullRequest.get(0).contains("/webSocket")){
@@ -243,7 +260,7 @@ public class ThreadWorker implements Runnable{
             byte[] message = content.getBytes();
             StringBuilder http = new StringBuilder();
             http.append("HTTP/1.1 " + statusCode + " " + statusMessage + "\r\n");
-            if(cookie.equals("")){
+            /*if(cookie.equals("")){
                 //System.out.println("pas de cookie trouver");
                 if(!firstLaunch){
                     http.append("Set-Cookie: SESSID=" + randomCookie() + "; Max-Age=3600; path=/; HttpOnly" + "\r\n");
@@ -253,12 +270,18 @@ public class ThreadWorker implements Runnable{
             if(firstLaunch){
                 http.append("Set-Cookie: SESSID=; Max-Age=0; path=/; HttpOnly" + "\r\n");
                 firstLaunch = false;
+            }*/
+            if (setCookie && SESSID != null) {
+                http.append("Set-Cookie: SESSID=").append(SESSID)
+                .append("; Max-Age=600; Path=/; HttpOnly\r\n");
+                setCookie = false;
             }
+        
             http.append("Content-Type: text/html" + "\r\n");
             http.append("Transfer-Encoding: chunked" + "\r\n");
 
             if(gzipCompression){
-                http.append("Content-Encoding : gzip" + "\r\n");
+                http.append("Content-Encoding: gzip\r\n");
                 message = gzipCompress(message);
             }
             http.append("\r\n");
@@ -280,7 +303,12 @@ public class ThreadWorker implements Runnable{
     private void redirectionResponse(String location){
         responseStream.println("HTTP/1.1 303 See Other");
         responseStream.println("Location: " + location);
-        responseStream.println("Content-Length : 0");
+        if (setCookie && SESSID != null) {
+                responseStream.append("Set-Cookie: SESSID=").append(SESSID)
+                .append("; Max-Age=600; Path=/; HttpOnly\r\n");
+                setCookie = false;
+        }
+        responseStream.println("Content-Length: 0");
         responseStream.println();
         responseStream.flush();
     }
@@ -318,7 +346,14 @@ public class ThreadWorker implements Runnable{
             WebSocket webSocket = new WebSocket(socket);
 
             while(true){
-                String clientRequest = webSocket.receive();
+                String clientRequest = null;
+                
+                try{
+                    clientRequest= webSocket.receive();
+                }
+                catch(IIOException e){
+                    System.err.println(e);
+                }
 
                 if(clientRequest == null)
                     break;
@@ -328,6 +363,8 @@ public class ThreadWorker implements Runnable{
                     break;
 
             }
+
+            try { socket.close(); } catch (IOException ignore) {}
         }
         catch(Exception e){
             System.err.println(e);
@@ -396,6 +433,7 @@ public class ThreadWorker implements Runnable{
                 session.setGame(game);
                 sendGrid(game, "GAME LOST", webSocket);
                 session.endGame();
+                try { socket.close(); } catch (IOException ignore) {}
                 return -1;
             }
             game = gameManager.getGame();
