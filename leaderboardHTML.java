@@ -37,36 +37,6 @@ public class leaderboardHTML{
         html.append("    </style>\n");
         html.append("</head>\n");
         html.append("<body>\n");
-/*        html.append("    <table>\n");
-        html.append("        <thead>\n");
-        html.append("            <tr>\n");
-        html.append("                <th>Nom du joueur</th>\n");
-        html.append("                <th>Temps</th>\n");
-        html.append("            </tr>\n");
-        html.append("        </thead>\n");
-        html.append("        <tbody id=\"player-list\">\n");
-        html.append("            <!-- Les données des joueurs seront insérées ici par JavaScript -->\n");
-        html.append("        </tbody>\n");
-        html.append("    </table>\n");
-        html.append("    <script>\n");
-        html.append("        const players = [\n");
-        html.append("            { name: \"Joueur 1\", time: 9.5 },\n");
-        html.append("            { name: \"Joueur 2\", time: 8.2 },\n");
-        html.append("            { name: \"Joueur 3\", time: 7.8 },\n");
-        html.append("            { name: \"Joueur 4\", time: 10.1 },\n");
-        html.append("            { name: \"Joueur 5\", time: 6.9 }\n");
-        html.append("        ];\n");
-        html.append("        players.sort((a, b) => a.time - b.time);\n");
-        html.append("        function displayPlayers() {\n");
-        html.append("            const playerList = document.getElementById(\"player-list\");\n");
-        html.append("            players.forEach(player => {\n");
-        html.append("                const row = document.createElement(\"tr\");\n");
-        html.append("                row.innerHTML = `<td>${player.name}</td><td>${player.time} s</td>`;\n");
-        html.append("                playerList.appendChild(row);\n");
-        html.append("            });\n");
-        html.append("        }\n");
-        html.append("        displayPlayers();\n");
-        html.append("    </script>\n");*/
         if(finishedGames == null){
             html.append("   <h1> Aucun score disponible</h1>");
         }
@@ -84,7 +54,7 @@ public class leaderboardHTML{
         StringBuilder leaderBoard = new StringBuilder();
         List<Session> sortedGames = new ArrayList<>(finishedGames);
         sortedGames.sort(Comparator.comparingLong(Session::getDuration));
-        leaderBoard.append("    <h1>Classement des meilleurs joueurs</h1>");    
+        leaderBoard.append("    <h1>Classement des meilleurs joueurs</h1>");
         leaderBoard.append("    <table>");
         leaderBoard.append("        <thead>");
         leaderBoard.append("            <tr>");
@@ -96,16 +66,19 @@ public class leaderboardHTML{
         leaderBoard.append("        <tbody>");
 
         int classement = 0;
-        for(Session game : sortedGames){
-            ++classement;
-            long second = (game.getDuration() / 1000) %60;
-            long Minute = (game.getDuration() / 1000) /60;
+        synchronized (sortedGames) {
+            
+            for(Session game : sortedGames){
+                ++classement;
+                long second = (game.getDuration() / 1000) %60;
+                long Minute = (game.getDuration() / 1000) /60;
 
-            leaderBoard.append("            <tr>");
-            String line = "            <td>"+classement+"</td><td>"+game.getPlayer()+"</td><td> "+String.format("%02d:%02d", Minute,second)+"</td>";
-            leaderBoard.append(line);
-            leaderBoard.append("            </tr>");
+                leaderBoard.append("            <tr>");
+                String line = "            <td>"+classement+"</td><td>"+game.getPlayer()+"</td><td> "+String.format("%02d:%02d", Minute,second)+"</td>";
+                leaderBoard.append(line);
+                leaderBoard.append("            </tr>");
 
+            }
         }
         if(classement == 0){
             leaderBoard.append("            <tr>");

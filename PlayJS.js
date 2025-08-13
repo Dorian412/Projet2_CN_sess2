@@ -26,7 +26,7 @@ function createGridFromString(MPgrid){
             }
             switch(MPgrid[i]){
                 case '#':
-                    cell.style.backgroundColor = 'light gray';
+                    cell.style.backgroundColor = 'lightgray';
                     break;
                 case '1':
                     cell.style.color = 'blue';

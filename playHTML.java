@@ -5,10 +5,10 @@ public class playHTML{
     /*cette fonction prends en arguments une session et deux String et va generer une page html sous forme de string 
      * qu elle va ensuite renvoyer. cette page differe en fonction des arguments recus
      */
-    public String generatePlayHTML(Session session, String bomb, String flag){
+    public String generatePlayHTML(Session session, String bomb, String flag, boolean errorFlag){
         StringBuilder html = new StringBuilder();
         String player ="Invité";
-        String game = null;
+        String game;
         String usableGameString = null;
         if(session != null){
             player = session.getPlayer();
@@ -31,13 +31,13 @@ public class playHTML{
         html.append("       .grid { display: grid; grid-template-columns: repeat(7, 30px); margin-top: 20px; grid-gap: 2px; justify-content: center; }\n");//modifier le 7 pour modifier le nombre de collones
         html.append("       .cell { width: 30px; height: 30px; border: 1px solid #aaa; background-color: lightgray; cursor: pointer; }\n");
         html.append("       .revealed { background-color: white; }\n");
-        html.append("       .flag { background-image: url('data:image/png;base64," + flag + "'); background-size: cover; }\n");
-        html.append("       .bomb { background-image: url('data:image/png;base64," + bomb + "'); background-size: cover; }\n");
+        html.append("       .flag { background-image: url('data:image/png;base64,").append(flag).append("'); background-size: cover; }\n");
+        html.append("       .bomb { background-image: url('data:image/png;base64,").append(bomb).append("'); background-size: cover; }\n");
         html.append("   </style>\n");
         html.append("</head>\n");
         html.append("<body>\n");
         html.append("   <h1>Minesweeper</h1>\n");
-        html.append("   <p id=\"current-player\">Player : " + player + "</p>");
+        html.append("   <p id=\"current-player\">Player : ").append(player).append("</p>");
         html.append("   <form method=\"POST\" action=\"/set_username\">\n");
         html.append("       <input type=\"text\" name=\"player_name\" placeholder=\"Entrez votre nom\" required>\n");
         html.append("       <button type=\"submit\">Mettre à jour</button>\n");
@@ -45,7 +45,7 @@ public class playHTML{
         html.append("   <div class=\"grid\" id=\"minesweeper-grid\"></div>\n");
         html.append("   <script>\n");
 
-        html.append("       let game = \"" + usableGameString + "\";\n");
+        html.append("       let game = \"").append(usableGameString).append("\";\n");
         
         html.append(convertFileToString("PlayJS.js"));
 
@@ -91,6 +91,7 @@ public class playHTML{
         html.append("           <button type=\"submit\">Send</button>");
         html.append("       </form>");      
         html.append("   </noscript>\n");
+        html.append("   <h2>Si la partie est terminée ( gagnée ou perdue), il suffit de refresh la page pour commencer une nouvelle partie</h2>");
         html.append("</body>\n");
         html.append("</html>");
 
@@ -105,11 +106,12 @@ public class playHTML{
         StringBuilder string = new StringBuilder();
 
         try{
-            BufferedReader reader = new BufferedReader(new FileReader(file));
-            String line;
-
-            while((line = reader.readLine()) != null){
-                string.append(line).append("\r\n");
+            try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+                String line;
+                
+                while((line = reader.readLine()) != null){
+                    string.append(line).append("\r\n");
+                }
             }
         }
         catch(IOException e){
@@ -125,12 +127,17 @@ public class playHTML{
         else {
             StringBuilder gridString = new StringBuilder();
             for(int i = 0; i < 49; i++){
-                if(game.get(i)[1] == 'R')
-                    gridString.append(game.get(i)[0]);
-                else if(game.get(i)[1] == 'F')
-                    gridString.append("F");
-                else
-                    gridString.append("#");
+                switch (game.get(i)[1]) {
+                    case 'R':
+                        gridString.append(game.get(i)[0]);
+                        break;
+                    case 'F':
+                        gridString.append("F");
+                        break;
+                    default:
+                        gridString.append("#");
+                        break;
+                }
                 if((i + 1) % 7 == 0){
                     gridString.append("\r\n");
                 }

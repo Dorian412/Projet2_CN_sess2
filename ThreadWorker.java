@@ -8,11 +8,11 @@ import java.util.zip.GZIPOutputStream;
 import javax.imageio.IIOException;
 import javax.imageio.ImageIO;
 
-//doit suprimer le cookie pour continuer de tester car mon client a tjr le meme cookie 
+//doit suprimer le cookie pour continuer de tester car mon client a tjr le meme cookie
 //update jsplus pq j ai ecrit ca au dessus
 //probleme il faut lancer deux fois la page pour qu il nous reconaise
-//si on fait juste une fois le GET play.html et qu on joue ca bug et la session nous reconais pas 
-//mais si on fait deux fois GET apres y a pas de pb 
+//si on fait juste une fois le GET play.html et qu on joue ca bug et la session nous reconais pas
+//mais si on fait deux fois GET apres y a pas de pb
 //ca vient peut etre du moment ou je store le cookie dans mo session store
 
 public class ThreadWorker implements Runnable{
@@ -23,7 +23,6 @@ public class ThreadWorker implements Runnable{
     private Session session = null;
     private static final Map<String, Session> sessionStore = new ConcurrentHashMap<>();// faire un systeme pr que les perime se barrent
     private static final List<Session> finishedGame = Collections.synchronizedList(new ArrayList<>());
-    private static boolean firstLaunch = true;//variable pour reset le cookie sinon erreur lors du redemarage du serveur car sessionStore est reset
     private boolean setCookie = false;
     private String SESSID = null;
     private List<char[]> game;
@@ -61,18 +60,13 @@ public class ThreadWorker implements Runnable{
                 }
 
                 System.out.println("requete : " + fullRequest.get(0));
-                //System.out.println("headers : " + fullRequest.get(1));
                 System.out.println("body : " + fullRequest.get(2));
-                //System.out.println("cookie : " + fullRequest.get(3));
-                //System.out.println("wsKey : " + fullRequest.get(4));
 
-                
-                
                 if(!fullRequest.get(3).isEmpty()){//recupere la session en fct du cookie recu
                     String cookieHeader = fullRequest.get(3);
 
                     int index = cookieHeader.indexOf(":");
-                    String cookie = null;
+                    String cookie;
                     if(index >=0)
                         cookie = cookieHeader.substring(index + 1).trim();
                     else
@@ -83,7 +77,7 @@ public class ThreadWorker implements Runnable{
                         for(String part : cookie.split(";")){
                             String p =part.trim();
                             if(p.regionMatches(true, 0, "SESSID=", 0, 7)){
-                                SESSID = part.substring(7).trim();
+                                SESSID = p.substring(7).trim();
                                 break;
                             }
                         }
@@ -99,7 +93,7 @@ public class ThreadWorker implements Runnable{
                     session = sessionStore.get(SESSID);
                     setCookie = true;
                 }    
-
+                
                 if(fullRequest.get(0).startsWith("GET")){
                     if(fullRequest.get(0).contains("/webSocket")){
                         String clientKey = fullRequest.get(4).split(":")[1].trim();
@@ -110,6 +104,12 @@ public class ThreadWorker implements Runnable{
                 }
                 else if(fullRequest.get(0).startsWith("POST"))
                     handlePostRequest(fullRequest);
+                else if (!"HTTP/1.1".equals(fullRequest.get(1).split(" ",3)[2])) {
+                    sendHttpResponse(505, "HTTP Version Not Supported", "<html><body>HTTP/1.1 required</body></html>", fullRequest.get(3));
+                }
+                else if(fullRequest == null || fullRequest.isEmpty() || fullRequest.get(1).toLowerCase().indexOf("host:") <0 ){
+                    sendHttpResponse(400, "Bad Request","<html><body><h1>400 - Malformed Request Line</h1></body></html>" , SESSID);
+                }
                 else{// en theorie pas besoin car seulement de GET et POST depuis un navigateur
                     sendHttpResponse(405, "Method Not Allowed", "<html><body><h1>405 - Method Not Allowed</h1><p>The method " + fullRequest.get(0) + " is not allowed.</p></body></html>", fullRequest.get(3));
                     break;
@@ -199,8 +199,16 @@ public class ThreadWorker implements Runnable{
         if(fullRequest.get(0).equals("GET /play.html HTTP/1.1")){
             //HTTP/1.1 200 OK
             //generer la page play.html
+            if(session != null && session.getGame() != null){
+
+                GameManager gamemanager = new GameManager(session.getGame());
+
+                if(session.getEnded() || gamemanager.getGameState() != 0){ //check si la partie est finie ou non, si oui on la reset
+                    session.resetGame();
+                }
+            }
             playHTML page = new playHTML();
-            sendHttpResponse(200, "OK", page.generatePlayHTML(session, bomb, flag), fullRequest.get(3));
+            sendHttpResponse(200, "OK", page.generatePlayHTML(session, bomb, flag,false), fullRequest.get(3));
         }
         else if(fullRequest.get(0).equals("GET /leaderboard.html HTTP/1.1")){
             //HTTP/1.1 200 OK
@@ -259,18 +267,7 @@ public class ThreadWorker implements Runnable{
         try{
             byte[] message = content.getBytes();
             StringBuilder http = new StringBuilder();
-            http.append("HTTP/1.1 " + statusCode + " " + statusMessage + "\r\n");
-            /*if(cookie.equals("")){
-                //System.out.println("pas de cookie trouver");
-                if(!firstLaunch){
-                    http.append("Set-Cookie: SESSID=" + randomCookie() + "; Max-Age=3600; path=/; HttpOnly" + "\r\n");
-                }
-            }
-            //la ligne juste en dessous c est pour reset le cookie si besoin
-            if(firstLaunch){
-                http.append("Set-Cookie: SESSID=; Max-Age=0; path=/; HttpOnly" + "\r\n");
-                firstLaunch = false;
-            }*/
+            http.append("HTTP/1.1 ").append(statusCode).append(" ").append(statusMessage).append("\r\n");
             if (setCookie && SESSID != null) {
                 http.append("Set-Cookie: SESSID=").append(SESSID)
                 .append("; Max-Age=600; Path=/; HttpOnly\r\n");
@@ -302,12 +299,11 @@ public class ThreadWorker implements Runnable{
      */
     private void redirectionResponse(String location){
         responseStream.println("HTTP/1.1 303 See Other");
-        responseStream.println("Location: " + location);
         if (setCookie && SESSID != null) {
-                responseStream.append("Set-Cookie: SESSID=").append(SESSID)
-                .append("; Max-Age=600; Path=/; HttpOnly\r\n");
-                setCookie = false;
+            responseStream.println("Set-Cookie: SESSID=" + SESSID + "; Max-Age=600; Path=/; HttpOnly");
+            setCookie = false;
         }
+        responseStream.println("Location: " + location);
         responseStream.println("Content-Length: 0");
         responseStream.println();
         responseStream.flush();
@@ -410,7 +406,7 @@ public class ThreadWorker implements Runnable{
             int row = Integer.parseInt(splitedRequest[1]);
             int col = Integer.parseInt(splitedRequest[2]);
 
-            if(row > 6 || col >6){
+            if(row > 6|| row <0 || col >6 || col <0){
                 handleWrongRequest("INVALID RANGE", webSocket);
                 return 0;
             }
@@ -424,7 +420,7 @@ public class ThreadWorker implements Runnable{
                 session.setGame(game);
                 sendGrid(game, "GAME WON", webSocket);
                 session.endGame();
-                finishedGame.add(session);
+                finishedGame.add(new Session(session));
                 return -1;
             }
             else if(gameManager.getGameState() == -1){
@@ -465,14 +461,14 @@ public class ThreadWorker implements Runnable{
 
             //verifie que la requete FLAG est conforme
             if(splitedRequest.length != 3){
-                handleWrongRequest("INVALID TRY SYNTAX", webSocket);
+                handleWrongRequest("INVALID Flag SYNTAX", webSocket);
             }
 
             //si row ou col est pas un nombre on a une numberformatexcpetion gerer dans le catch
             int row = Integer.parseInt(splitedRequest[1]);
             int col = Integer.parseInt(splitedRequest[2]);
 
-            if(row > 6 || col > 6){
+            if(row > 6|| row <0 || col >6 || col <0){
                 handleWrongRequest("INVALID RANGE", webSocket);
             }
 
@@ -482,12 +478,12 @@ public class ThreadWorker implements Runnable{
             game = gameManager.getGame();
             session.setGame(game);
             sendGrid(game, null, webSocket);
-            return;
+            
 
         }
         catch(NumberFormatException e){
             handleWrongRequest("col and row have to be NUMBERS", webSocket);
-            return;
+            
         }
     }
 
@@ -499,7 +495,7 @@ public class ThreadWorker implements Runnable{
         catch(IOException e){
             System.err.println(e);
         }
-        return;
+        
     }
 
     /*cette fonction prends en argument une partie, un message et le websocket par lequel envoyer 
@@ -536,7 +532,7 @@ public class ThreadWorker implements Runnable{
         catch(Exception e){
             System.err.println(e);
         }
-        return;
+        
     }
 
     /*cette fonction prends en arguments un string (path vers une image) et va 
@@ -619,16 +615,19 @@ public class ThreadWorker implements Runnable{
             if(gameManager.getGameState() == 1){
                 //à appronfondir
                 session.endGame();
-                finishedGame.add(session);
+                finishedGame.add(new Session(session));
+            }
+            if(gameManager.getGameState() == -1){
+                session.endGame();
             }
 
             playHTML page = new playHTML();
             //sendHttpResponse(200, "OK", page.generatePlayHTML(session, bomb, flag), cookie);
             redirectionResponse("http://localhost:8014/play.html");
-            return ;
+            
         }
         catch(NumberFormatException e){
-            return ;
+            
         }
     }
     private void handlePostFlagRequest(String request, String cookie){
@@ -648,11 +647,11 @@ public class ThreadWorker implements Runnable{
             playHTML page = new playHTML();
             //sendHttpResponse(200, "OK", page.generatePlayHTML(session, bomb, flag), cookie);
             redirectionResponse("http://localhost:8014/play.html");
-            return;
+            
 
         }
         catch(NumberFormatException e){
-            return;
+            
         }
     }
 

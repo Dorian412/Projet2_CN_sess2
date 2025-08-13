@@ -1,6 +1,5 @@
-import java.io.*;
+import java.io.IOException;
 import java.net.*;
-import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -39,9 +38,10 @@ public class MinesweeperServer {
             }
 
         }
-        catch(Exception e)
+        catch(IOException | NumberFormatException e)
         {
             System.err.println(e);
+            threadPool.shutdown();
         }
 
     }

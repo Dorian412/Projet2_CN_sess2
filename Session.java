@@ -15,6 +15,14 @@ public class Session{
         this.duration = 0;
         this.ended = false;
     }
+
+    public Session(Session copy){
+        this.player = copy.player;
+        this.game = null;
+        this.startTime = copy.startTime;
+        this.duration = copy.duration;
+        this.ended = copy.ended;
+    }
     
     public void setPlayer(String player){
         this.player = player;
@@ -39,5 +47,13 @@ public class Session{
 
     public long getDuration(){
         return this.duration;
+    }
+    public boolean getEnded(){ return this.ended;}
+
+    public void resetGame(){
+        this.startTime = System.currentTimeMillis();
+        this.duration = 0;
+        this.ended = false;
+        this.game = null;
     }
 }
